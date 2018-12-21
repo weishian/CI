@@ -131,5 +131,17 @@ vagrant package --base "You VM name in VirtualBox" --output "path/box-name-versi
 > Scripts for building Vagrant boxes for VMware Fusion that boot macOS.
 
 + [Mac OS X Vagrant box for VirtualBox](https://app.vagrantup.com/AndrewDryga/boxes/vagrant-box-osx)
+ 
+目前調查研究已完成，相關 Docker、Vagrant 說明請參考如下文件：
+ 
+http://gitlab.yxunistar.com/ISSUE/Issue_Mobile_development_framework/blob/master/doc/compiled%20environment%20virtualization.md
+ 
+Vagrantfile demo
+ 
+http://gitlab.yxunistar.com/ISSUE/Issue_Mobile_development_framework/tree/master/code/vagrant/osx
+ 
+Docker demo
+ 
+http://gitlab.yxunistar.com/ISSUE/Issue_Mobile_development_framework/tree/master/code/docker
 
 ---
