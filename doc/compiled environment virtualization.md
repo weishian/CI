@@ -1,40 +1,6 @@
 # Mobile Compiled Environment Architecture
 
-## 編譯環境虛擬化
-
-任何前端應用程式，在發佈並提供給使用者前，皆需經過編譯並加上數位簽章。
-
-然而，依據不同環境對應之應用程式，非但其應用程式框架、語言不同，連編譯環境需求也皆有不同；對此，對應不同應用程式就需應對其所需建立編譯環境，在將編譯結果整併至待發佈主機 (各環境 Jenkins)。
-
-理想情況下，各環境在編譯時為獨立且不互相干擾，除避免因為編譯階段導致的資源衝突，亦避免編譯導致的效能耗損；但現實情況，則因為應用程式所需編譯環境獨特，導致編譯空間需為實體主機，從而導致成本問題影響主機擴展問題；綜合考量成本、效能下，使用 Docker 等虛擬化主機做為編譯主機是最為適當的方式，然而虛擬化主機是否能完成編譯工作，則需要額外測試，並確認在可更新環境的前提下，確保編譯結果能符合預期，並在對應環境能正常執行。
-
-## Android
-
-+ [Android Studio in Ubuntu](https://developer.android.com/studio/install)
-  - [android studio docker](https://github.com/yongjhih/docker-android-studio)
-  - [Android-Studio docker container](https://github.com/Deadolus/android-studio-docker)
-  - [docker-android-studio](https://github.com/fgrehm/docker-android-studio/blob/master/Dockerfile)
-  - [Build an Android app with docker: Build, Push and Pull docker image.](https://medium.com/@AndreSand/building-android-with-docker-8dbf717f54d4)
-
-+ [Android SDK Download](https://developer.android.com/studio/)
-
-```
-# build ubuntu + java8
-cd code/docker/java8
-docker build --rm -t "ubuntu-java8" .
-
-# build andoird, form ubuntu-java8
-cd code/docker/android
-docker build --rm -t "ubuntu-android" .
-
-# Compiled project, like pf-bu-android (git clone before compiled)
-cd pf-bu-androids
-docker run -ti -v "$PWD":/home/repo/ ubuntu-android bash
-cd home/repo/
-sh gradlew clean build -Penv=sit
-```
-
-## iOS
+## Create iOS VirtualBox for Vagrant
 
 OSX 本身雖為 Unix 基底的作業系統，但相對於 Linux 在核心上有一定的差異，且操作方式的不同，這也使得虛擬化過程中無法完全依靠腳本編譯。
 
