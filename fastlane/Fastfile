@@ -1,0 +1,168 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  
+  ##### Build Section
+
+  desc "Build dependencies"
+  lane :build_dependencies do
+    cocoapods(
+      clean: true,
+      podfile: "./Podfile",
+      verbose: true
+    )
+    carthage(
+      command: "bootstrap",
+      use_ssh: true,
+      use_binaries: false,
+      no_build: false,
+      verbose: false,
+      platform: "iOS",
+      configuration: "Release",
+      cache_builds: true,
+      new_resolver: false
+    )
+    skip_docs
+  end
+
+  desc "Update version"
+  lane :update_version_and_build_number do |options|
+    version_number = options[:version_number] ? options[:version_number] : ENV["VERSION_NUMBER"]
+    build_number = options[:build_number] ? options[:build_number] : number_of_commits.to_s
+    increment_version_number(version_number: version_number)
+    increment_build_number(build_number: build_number)
+  end
+
+  desc "keychain_binding"
+  lane :keychain_binding do
+    sh "bash ./script.sh"
+  end
+
+  desc "Build project"
+  lane :build_project do
+    # Prepare variables
+    scheme = ENV["PROJECT_SCHEME"]
+    configuration = ENV["BUILD_CONFIGURATION"]
+    version_number = ENV["VERSION_NUMBER"]
+    build_number = number_of_commits.to_s
+
+    # Start build process
+    ensure_xcode_version(version: "10.1")
+    clear_build
+    unlock_keychain(path: "proto.keychain-db", password: "1qaz2wsx")
+    keychain_binding
+    update_version_and_build_number
+    build_dependencies
+    build_ios_app(
+      workspace: "Proto.xcworkspace",
+      scheme: scheme,
+      clean: true,
+      configuration: configuration,
+      codesigning_identity: ENV["CODE_SIGN_IDENTITY"],
+      archive_path: "./build/archive",
+      derived_data_path: "./build/DerivedData",
+      buildlog_path: "./build",
+      sdk: "iphoneos",
+      export_options: create_export_options(scheme: scheme),
+      output_directory: "./build/artifacts",
+      output_name: "#{ENV["FILE_NAME"]}"
+    )
+    update_manifest_after_build(version_number: version_number, build_number: build_number) if scheme == "Proto"
+    export_manifest_images
+    upload_symbols_to_crashlytics(
+      dsym_path: "./build/artifacts/#{ENV["FILE_NAME"]}.app.dSYM.zip",
+      api_token: ENV["FABRIC_API_KEY"],
+      binary_path: "./Pods/Fabric/upload-symbols",
+      platform: "ios",
+      dsym_worker_threads: "4",
+    )
+    package_artifacts
+    reset_git_repo(force: true, files: git_reset_file_list)
+  end
+
+  ##### Custom Proecss
+
+  def clear_build
+    FileUtils.cd("..", :verbose => true) do
+      FileUtils.remove_dir("build", true)
+    end
+  end
+
+  def create_export_options(params)
+    scheme = params[:scheme]
+    export_options = {
+      method: ENV["EXPORT_METHOD"],
+      provisioningProfiles: {
+        ENV["BUNDLE_ID"] => ENV["PROVISIONING_PROFILES"],
+        ENV["BUNDLE_ID_NS"] => ENV["PROVISIONING_PROFILES_NS"]
+      }
+    }
+
+    export_options[:manifest] = {
+      appURL: ENV["APP_URL"],
+      displayImageURL: ENV["DISPLAY_IMAGE_URL"],
+      fullSizeImageURL: ENV["FULL_SIZE_IMAGE_URL"]
+    } if scheme == "Proto"
+
+    export_options[:compileBitcode] = false if scheme == "Proto"
+
+    export_options
+  end
+
+  def update_manifest_after_build(params)
+    update_plist(
+      plist_path: "./build/artifacts/manifest.plist",
+      block: proc do |plist|
+        plist["items"][0]["metadata"]["title"] = "优游娱乐"
+        plist["items"][0]["metadata"]["CFBundleShortVersionString"] = params[:version_number]
+        plist["items"][0]["metadata"]["CFBundleVersion"] = params[:build_number]
+        plist["items"][0]["metadata"]["release-notes"] = ENV["RELEASE_NOTES"].split(":")
+      end
+    )
+  end
+
+  def export_manifest_images
+    FileUtils.cd("../misc/manifest", :verbose => true) do
+      FileUtils.cp(%w(display-image.png full-size-image.png), '../../build/artifacts', :verbose => true)
+    end
+  end
+
+  def package_artifacts
+    FileUtils.cd("../build/artifacts", :verbose => true) do
+      FileUtils.cp("manifest.plist", "#{ENV["FILE_NAME"]}.plist", :verbose => true)
+      # Keeps old plist name on transition period.
+      FileUtils.mv("manifest.plist", "#{ENV["FILE_NAME_OLD"]}.plist", :verbose => true)
+      FileUtils.mkdir_p("./upload", :verbose => true)
+      FileUtils.mv(Dir.glob("*.{png,plist,ipa}"), "upload", :verbose => true)
+    end
+  end
+
+  def git_reset_file_list
+    list = [
+      "./Proto/Proto-Info.plist",
+      "./Proto/Haha-Info.plist",
+      "./ProtoTests/Info.plist",
+      "./NotificationService/Info.plist",
+      "./Proto.xcodeproj/project.pbxproj"
+    ]
+    list
+  end
+end
+
+# Import bottom to keep the order of lanes on auto-generated README.md.
+import "./CodeSigningFastfile"
